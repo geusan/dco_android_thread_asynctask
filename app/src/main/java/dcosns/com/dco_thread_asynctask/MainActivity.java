@@ -7,8 +7,16 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.View;
 import android.widget.EditText;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -35,6 +43,10 @@ public class MainActivity extends AppCompatActivity {
         new MyAsyncTask().execute(0, 3);
     }
 
+    private void doHttpConnectAction(){
+        new NetThread().start();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,6 +54,7 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.button1).setOnClickListener(bHandler);
         findViewById(R.id.button2).setOnClickListener(bHandler);
+        findViewById(R.id.button3).setOnClickListener(bHandler);
 
         editText = (EditText) findViewById(R.id.editText);
 
@@ -143,6 +156,8 @@ public class MainActivity extends AppCompatActivity {
                 case 2:
                     editText.setBackgroundColor(Color.MAGENTA);
                     break;
+                case 100:
+                    break;
             }
             String s = editText.getText().toString() + "\n";
             editText.setText(s);
@@ -207,7 +222,62 @@ public class MainActivity extends AppCompatActivity {
             }
             return "SUCCESS"; // onPostExecute로 넘길 데이터 String값이다.
         }
+    }
 
 
+    /**
+     * 인터넷에 접속하는 메소드
+     * 차례차례 이렇게 한다는 것을 알아두면 좋을 것 같다.
+     */
+    class NetThread extends Thread{
+        @Override
+        public void run() {
+            String url = "http://dcosns.dothome.co.kr/jsonparse.php"; // sample url
+            URL webUrl = null;
+            try{
+                webUrl = new URL(url); //String을 URL주소로 변형해준다.
+            }catch (MalformedURLException e){
+                e.printStackTrace();
+            }
+
+            HttpURLConnection connection = null; //연결 정의(java library)
+            BufferedReader reader = null;       // 연결후 응답을 받을 리더 정의
+
+            try{
+                if(webUrl != null) //URL을 통해서 연결
+                    connection = (HttpURLConnection) webUrl.openConnection();
+                int code = connection.getResponseCode();
+                //통신코드 Http 오류종류를 검색해보면 여러가지가 나오는데 200을 제외하곤 다 비정상이다.
+                switch (code){
+                    case 200:
+                        //정상일 경우
+                        try{
+                            //응답 메시지 받아옴 한줄씩 받아오기 위해 여러 객체를 연결해서 사용
+                            reader = new BufferedReader( //한줄씩
+                                    new InputStreamReader( //한단어씩(?)
+                                            connection.getInputStream()));//한글자씩(?)
+                            String str = "";
+                            StringBuilder sb = new StringBuilder();
+                            while((str = reader.readLine()) != null){
+                                //string builder로 모두다 차례차례 가져옴
+                                sb.append(str).append("\n");
+                            }
+                            Log.d("test", sb.toString()); // 응답 로그로 확인
+                            //응답 메시지로 보내서 기기 화면에서 확인
+                            Message msg = uiHandler.obtainMessage();
+                            msg.what = 100;
+                            msg.obj = sb.toString();
+                            uiHandler.sendMessage(msg);
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }catch (IOException e){
+                e.printStackTrace();
+            }
+        }
     }
 }
